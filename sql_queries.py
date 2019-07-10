@@ -34,12 +34,11 @@ CREATE TABLE staging_events(
     registration VARCHAR(50),	
     session_id	BIGINT,
     song_title VARCHAR(255),
-    status INTEGER,  -- SHOULD BE ALWAYS A NUMBER, HTTP STATUS	
+    status INTEGER, 
     ts VARCHAR(50),
     user_agent TEXT,	
     user_id VARCHAR(100),
     PRIMARY KEY (event_id))
-)
 """)
 
 staging_songs_table_create = ("""
@@ -60,11 +59,11 @@ CREATE TABLE staging_songs(
 songplay_table_create = ("""
 CREATE TABLE songplays(
     songplay_id INT IDENTITY(0,1),
-    start_time TIMESTAMP REFERENCES time(start_time),
-    user_id VARCHAR(50) REFERENCES users(user_id),
+    start_time TIMESTAMP,
+    user_id VARCHAR(50),
     level VARCHAR(50),
-    song_id VARCHAR(100) REFERENCES songs(song_id),
-    artist_id VARCHAR(100) REFERENCES artists(artist_id),
+    song_id VARCHAR(100),
+    artist_id VARCHAR(100),
     session_id BIGINT,
     location VARCHAR(255),
     user_agent TEXT,
@@ -115,27 +114,89 @@ CREATE TABLE time(
 
 # STAGING TABLES
 
-staging_events_copy = ("""
-""").format()
+staging_events_copy = ("""COPY staging_events FROM '{}'
+ credentials 'aws_iam_role={}'
+ region 'us-west-2' 
+ COMPUPDATE OFF
+ JSON '{}'""").format(config.get('S3','LOG_DATA'),
+                        config.get('IAM_ROLE', 'ARN'),
+                        config.get('S3','LOG_JSONPATH'))
 
-staging_songs_copy = ("""
-""").format()
+
+staging_songs_copy = ("""COPY staging_songs FROM '{}'
+    credentials 'aws_iam_role={}'
+    region 'us-west-2' 
+    COMPUPDATE OFF 
+    JSON 'auto'
+    """).format(config.get('S3','SONG_DATA'), 
+                config.get('IAM_ROLE', 'ARN'))
 
 # FINAL TABLES
 
 songplay_table_insert = ("""
+INSERT INTO songplays (start_time, user_id, level, song_id, artist_id, session_id, location, user_agent) 
+SELECT  
+    TIMESTAMP 'epoch' + e.ts/1000 * interval '1 second' as start_time, 
+    e.user_id, 
+    e.level, 
+    s.song_id,
+    s.artist_id, 
+    e.session_id,
+    e.location, 
+    e.user_agent
+FROM staging_events e, staging_songs s
+WHERE e.page = 'NextSong' 
+AND e.song = s.title 
+AND e.artist = s.artist_name 
+AND e.length = s.duration
 """)
 
 user_table_insert = ("""
+INSERT INTO users (user_id, first_name, last_name, gender, level)
+SELECT DISTINCT  
+    user_id, 
+    user_first_name, 
+    user_last_name, 
+    user_gender, 
+    user_level
+FROM staging_events
+WHERE page = 'NextSong'
 """)
 
 song_table_insert = ("""
+INSERT INTO songs (song_id, title, artist_id, year, duration) 
+SELECT DISTINCT 
+    song_id, 
+    title,
+    artist_id,
+    year,
+    duration
+FROM staging_songs
+WHERE song_id IS NOT NULL
 """)
 
 artist_table_insert = ("""
+INSERT INTO artists (artist_id, name, location, latitude, longitude) 
+SELECT DISTINCT 
+    artist_id,
+    artist_name,
+    artist_location,
+    artist_latitude,
+    artist_longitude
+FROM staging_songs
+WHERE artist_id IS NOT NULL
 """)
 
 time_table_insert = ("""
+INSERT INTO time(start_time, hour, day, week, month, year, weekDay)
+SELECT start_time, 
+    extract(hour from start_time),
+    extract(day from start_time),
+    extract(week from start_time), 
+    extract(month from start_time),
+    extract(year from start_time), 
+    extract(dayofweek from start_time)
+FROM songplay
 """)
 
 # QUERY LISTS

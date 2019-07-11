@@ -114,22 +114,34 @@ CREATE TABLE time(
 
 # STAGING TABLES
 
-staging_events_copy = ("""COPY staging_events FROM '{}'
- credentials 'aws_iam_role={}'
- region 'us-west-2' 
- COMPUPDATE OFF
- JSON '{}'""").format(config.get('S3','LOG_DATA'),
-                        config.get('IAM_ROLE', 'ARN'),
-                        config.get('S3','LOG_JSONPATH'))
+# staging_events_copy = ("""COPY staging_events FROM '{}'
+#  credentials 'aws_iam_role={}'
+#  region 'us-west-2' 
+#  COMPUPDATE OFF
+#  JSON '{}'""").format(config.get('S3','LOG_DATA'),
+#                         config.get('IAM_ROLE', 'ARN'),
+#                         config.get('S3','LOG_JSONPATH'))
 
 
-staging_songs_copy = ("""COPY staging_songs FROM '{}'
-    credentials 'aws_iam_role={}'
-    region 'us-west-2' 
-    COMPUPDATE OFF 
-    JSON 'auto'
-    """).format(config.get('S3','SONG_DATA'), 
-                config.get('IAM_ROLE', 'ARN'))
+# staging_songs_copy = ("""COPY staging_songs FROM '{}'
+#     credentials 'aws_iam_role={}'
+#     region 'us-west-2' 
+#     COMPUPDATE OFF 
+#     JSON 'auto'
+#     """).format(config.get('S3','SONG_DATA'), 
+#                 config.get('IAM_ROLE', 'ARN'))
+
+staging_events_copy = ("""copy staging_events 
+                          from {}
+                          iam_role {}
+                          json {};
+                       """).format(config.get('S3','LOG_DATA'), config.get('IAM_ROLE', 'ARN'), config.get('S3','LOG_JSONPATH'))
+
+staging_songs_copy = ("""copy staging_songs 
+                          from {} 
+                          iam_role {}
+                          json 'auto';
+                      """).format(config.get('S3','SONG_DATA'), config.get('IAM_ROLE', 'ARN'))
 
 # FINAL TABLES
 
@@ -138,7 +150,7 @@ INSERT INTO songplays (start_time, user_id, level, song_id, artist_id, session_i
 SELECT  
     TIMESTAMP 'epoch' + e.ts/1000 * interval '1 second' as start_time, 
     e.user_id, 
-    e.level, 
+    e.user_level, 
     s.song_id,
     s.artist_id, 
     e.session_id,

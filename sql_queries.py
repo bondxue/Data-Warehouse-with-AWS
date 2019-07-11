@@ -114,23 +114,6 @@ CREATE TABLE time(
 
 # STAGING TABLES
 
-# staging_events_copy = ("""COPY staging_events FROM '{}'
-#  credentials 'aws_iam_role={}'
-#  region 'us-west-2' 
-#  COMPUPDATE OFF
-#  JSON '{}'""").format(config.get('S3','LOG_DATA'),
-#                         config.get('IAM_ROLE', 'ARN'),
-#                         config.get('S3','LOG_JSONPATH'))
-
-
-# staging_songs_copy = ("""COPY staging_songs FROM '{}'
-#     credentials 'aws_iam_role={}'
-#     region 'us-west-2' 
-#     COMPUPDATE OFF 
-#     JSON 'auto'
-#     """).format(config.get('S3','SONG_DATA'), 
-#                 config.get('IAM_ROLE', 'ARN'))
-
 staging_events_copy = ("""copy staging_events 
                           from {}
                           iam_role {}
@@ -158,9 +141,9 @@ SELECT
     e.user_agent
 FROM staging_events e, staging_songs s
 WHERE e.page = 'NextSong' 
-AND e.song = s.title 
-AND e.artist = s.artist_name 
-AND e.length = s.duration
+AND e.song_title = s.title 
+AND e.artist_name = s.artist_name 
+AND e.song_length = s.duration
 """)
 
 user_table_insert = ("""
@@ -208,7 +191,7 @@ SELECT start_time,
     extract(month from start_time),
     extract(year from start_time), 
     extract(dayofweek from start_time)
-FROM songplay
+FROM songplays
 """)
 
 # QUERY LISTS
